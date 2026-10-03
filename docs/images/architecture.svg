@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="850" viewBox="0 0 1600 850" role="img" aria-labelledby="diagram-title diagram-desc">
+  <title id="diagram-title">C++ Multi-LLM Chat 源码架构</title>
+  <desc id="diagram-desc">Web 界面通过 HTTP 请求调用 chatServer，再进入 chat_sdk。LLMManager 每次选择一个 Provider，四个 Provider 之间没有 fallback 箭头。上游增量经回调返回 SDK、HTTP SSE 和浏览器。SDK 的 SessionManager 通过 DataManager 与 SQLite 双向读写会话和消息。</desc>
+  <defs>
+    <marker id="arrow-request" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11 Z" fill="#23486f"/></marker>
+    <marker id="arrow-response" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11 Z" fill="#138878"/></marker>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif; fill:#173454; font-size:24px; }
+      .heading { font-size:30px; font-weight:700; }
+      .section { font-size:28px; font-weight:700; }
+      .name { font-size:26px; font-weight:700; }
+      .white { fill:#ffffff; }
+      .muted { fill:#53687e; }
+      .request { fill:none; stroke:#23486f; stroke-width:3.5; marker-end:url(#arrow-request); }
+      .response { fill:none; stroke:#138878; stroke-width:3.5; marker-end:url(#arrow-response); }
+      .detail { fill:none; stroke:#7893a8; stroke-width:2.5; stroke-dasharray:8 6; }
+    </style>
+  </defs>
+  <rect width="1600" height="850" fill="#f4f7fb"/>
+  <text x="60" y="62" class="heading" text-anchor="start">多模型聊天：SDK、持久化与真实增量流式</text>
+  <text x="60" y="104" class="muted" text-anchor="start">C++17 · HTTP / SSE · SQLite · 单次请求选择一个 Provider</text>
+  <path class="request" d="M1010 63 L1070 63"/>
+  <text x="1085" y="71" text-anchor="start">请求</text>
+  <path class="response" d="M1230 63 L1170 63"/>
+  <text x="1247" y="71" text-anchor="start">返回</text>
+  <rect x="65" y="158" width="230" height="214" rx="18" fill="#ffffff" stroke="#ccdceb" stroke-width="2"/>
+  <text x="180" y="205" class="name" text-anchor="middle">Web 界面</text>
+  <text x="180" y="250" text-anchor="middle">Fetch 请求</text>
+  <text x="180" y="298" class="muted" text-anchor="middle">ReadableStream</text>
+  <rect x="340" y="158" width="250" height="214" rx="18" fill="#ffffff" stroke="#ccdceb" stroke-width="2"/>
+  <text x="465" y="205" class="name" text-anchor="middle">chatServer</text>
+  <text x="465" y="250" text-anchor="middle">HTTP API</text>
+  <text x="465" y="298" class="muted" text-anchor="middle">SSE 输出</text>
+  <rect x="635" y="158" width="245" height="214" rx="18" fill="#173b65" stroke="#173b65" stroke-width="2"/>
+  <text x="757.5" y="205" class="name white" text-anchor="middle">chat_sdk</text>
+  <text x="757.5" y="250" class="white" text-anchor="middle">会话与消息入口</text>
+  <text x="757.5" y="298" class="white" text-anchor="middle">统一 SDK</text>
+  <rect x="925" y="158" width="235" height="214" rx="18" fill="#ffffff" stroke="#ccdceb" stroke-width="2"/>
+  <text x="1042.5" y="205" class="name" text-anchor="middle">LLMManager</text>
+  <text x="1042.5" y="250" text-anchor="middle">按模型分发</text>
+  <text x="1042.5" y="298" class="muted" text-anchor="middle">调用一个 Provider</text>
+  <path class="request" d="M295 234 L340 234"/>
+  <path class="response" d="M340 330 L295 330"/>
+  <path class="request" d="M590 234 L635 234"/>
+  <path class="response" d="M635 330 L590 330"/>
+  <path class="request" d="M880 234 L925 234"/>
+  <path class="response" d="M925 330 L880 330"/>
+  <rect x="1205" y="158" width="330" height="282" rx="18" fill="#fff1dc" stroke="#e6c695" stroke-width="2"/>
+  <text x="1370" y="198" class="section" text-anchor="middle">Provider 适配器</text>
+  <text x="1370" y="236" text-anchor="middle">每次选择一个</text>
+  <rect x="1225" y="257" width="290" height="35" rx="9" fill="#ffffff" stroke="#eadac1" stroke-width="2"/>
+  <text x="1370" y="283" text-anchor="middle">DeepSeekProvider</text>
+  <rect x="1225" y="298" width="290" height="35" rx="9" fill="#ffffff" stroke="#eadac1" stroke-width="2"/>
+  <text x="1370" y="324" text-anchor="middle">ChatGPTProvider</text>
+  <rect x="1225" y="339" width="290" height="35" rx="9" fill="#ffffff" stroke="#eadac1" stroke-width="2"/>
+  <text x="1370" y="365" text-anchor="middle">GeminiProvider</text>
+  <rect x="1225" y="380" width="290" height="35" rx="9" fill="#ffffff" stroke="#eadac1" stroke-width="2"/>
+  <text x="1370" y="406" text-anchor="middle">OllamaDeepSeekProvider</text>
+  <path class="request" d="M1160 234 L1205 234"/>
+  <path class="response" d="M1205 330 L1160 330"/>
+  <text x="340" y="413" class="muted" text-anchor="start">青绿方向：上游增量 → Provider 回调 → SDK → HTTP SSE → 浏览器</text>
+  <rect x="65" y="500" width="510" height="114" rx="18" fill="#eaf2fb" stroke="#bed2e6" stroke-width="2"/>
+  <text x="88" y="541" class="name" text-anchor="start">会话与历史消息</text>
+  <text x="88" y="587" class="muted" text-anchor="start">由 SDK 读取历史，再交给选定模型</text>
+  <rect x="635" y="500" width="245" height="114" rx="18" fill="#e0f3eb" stroke="#abd4c6" stroke-width="2"/>
+  <text x="757" y="545" class="name" text-anchor="middle">SessionManager</text>
+  <text x="757" y="588" text-anchor="middle">会话与历史</text>
+  <rect x="925" y="500" width="245" height="114" rx="18" fill="#e0f3eb" stroke="#abd4c6" stroke-width="2"/>
+  <text x="1047" y="545" class="name" text-anchor="middle">DataManager</text>
+  <text x="1047" y="588" text-anchor="middle">参数绑定 SQL</text>
+  <rect x="1215" y="500" width="320" height="114" rx="18" fill="#eaf2fb" stroke="#bed2e6" stroke-width="2"/>
+  <text x="1375" y="545" class="name" text-anchor="middle">SQLite</text>
+  <text x="1375" y="588" text-anchor="middle">chatDB.db · 会话 / 消息</text>
+  <path class="request" d="M757 372 L757 500"/>
+  <text x="785" y="470" class="muted" text-anchor="start">会话操作</text>
+  <path class="request" d="M880 542 L925 542"/>
+  <path class="response" d="M925 585 L880 585"/>
+  <path class="request" d="M1170 542 L1215 542"/>
+  <path class="response" d="M1215 585 L1170 585"/>
+  <rect x="65" y="682" width="1470" height="103" rx="18" fill="#ffffff" stroke="#d1dfec" stroke-width="2"/>
+  <text x="89" y="719" class="name" text-anchor="start">实现边界</text>
+  <text x="89" y="757" class="muted" text-anchor="start">Provider 之间没有 fallback；当前未实现自动重试、下游用户鉴权或会话用户隔离。</text>
+  <text x="65" y="825" class="muted" text-anchor="start">模型列表来自初始化标记；实际上游可用性、账号权限与完整运行链路尚未验证。</text>
+</svg>
