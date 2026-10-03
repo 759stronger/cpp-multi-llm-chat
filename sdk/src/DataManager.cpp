@@ -1,5 +1,5 @@
-#include "../include/dataManager.h"
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/dataManager.h>
+#include <ai_chat_sdk/util/my_logger.h>
 #include <sqlite3.h>
 
 namespace chatsdk {

@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
-#include "../chatsdk/include/DeepSeekProvider.h"
-#include "../chatsdk/include/ChatGPTProvider.h"
-#include "../chatsdk/include/GeminiProvider.h"
-#include "../chatsdk/include/OllamaDeepSeekProvider.h"
-#include "../chatsdk/include/util/my_logger.h"
-#include "../chatsdk/include/common.h"
-#include "../chatsdk/include/chat_sdk.h"
-#include "../chatsdk/include/session_manager.h"
-#include "../chatsdk/include/dataManager.h"
+#include <ai_chat_sdk/DeepSeekProvider.h>
+#include <ai_chat_sdk/ChatGPTProvider.h>
+#include <ai_chat_sdk/GeminiProvider.h>
+#include <ai_chat_sdk/OllamaDeepSeekProvider.h>
+#include <ai_chat_sdk/util/my_logger.h>
+#include <ai_chat_sdk/common.h>
+#include <ai_chat_sdk/chat_sdk.h>
+#include <ai_chat_sdk/session_manager.h>
+#include <ai_chat_sdk/dataManager.h>
 
 
 // TEST(DeepSeekProviderTEST   , sendMessageDeepseek) {

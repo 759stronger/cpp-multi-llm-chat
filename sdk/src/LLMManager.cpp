@@ -1,5 +1,5 @@
-#include "../include/LLMManager.h"
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/LLMManager.h>
+#include <ai_chat_sdk/util/my_logger.h>
 
 namespace chatsdk {
 

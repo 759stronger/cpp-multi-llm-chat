@@ -1,5 +1,5 @@
 #include <gflags/gflags.h>
-#include "chatServer.h"
+#include "chat_server.h"
 #include <fstream>
 #include <ai_chat_sdk/util/my_logger.h>
 #include <thread>

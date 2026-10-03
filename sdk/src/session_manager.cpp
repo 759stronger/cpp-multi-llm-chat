@@ -1,6 +1,6 @@
-#include "../include/session_manager.h"
+#include <ai_chat_sdk/session_manager.h>
 #include <sstream>
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/util/my_logger.h>
 #include <iomanip>
 
 namespace chatsdk {

@@ -37,21 +37,25 @@ Web 前端
 
 ## 目录
 
-```text
-chatsdk/
-├── include/                 SDK、Provider、会话与存储接口
-├── src/                     对应实现
-└── CMakeLists.txt           ai_chat_sdk 静态库与安装规则
-chatServer/
-├── main.cpp                 参数解析、环境变量与启动入口
-├── chatServer.cpp/.h        HTTP API、SSE 与服务生命周期
+~~~text
+CMakeLists.txt              根构建入口，直接连接 SDK 与应用目标
+sdk/
+├── include/ai_chat_sdk/    SDK、Provider、会话与存储公共头文件
+├── src/                    对应实现
+└── CMakeLists.txt          ai_chat_sdk 静态库与可选安装规则
+apps/chat_server/
+├── main.cpp                参数解析、环境变量与启动入口
+├── chat_server.cpp/.h      HTTP API、SSE 与服务生命周期
 ├── CMakeLists.txt
-└── www/                     HTML、CSS 与原生 JavaScript 前端
-test/
-├── testLLM.cpp              GTest 示例及真实上游交互测试
+└── www/                    HTML、CSS 与原生 JavaScript 前端
+tests/
+├── test_llm.cpp            需要真实模型与终端输入的手动集成测试
 └── CMakeLists.txt
 docs/images/                项目概览与架构图
-```
+local/backups/              已有私有备份，仅本地保留并排除 Git 上传
+~~~
+
+数据库、日志及旧 build 目录均不公开上传。旧构建目录保留在本地，但目录调整后应重新生成构建配置，不复用旧 CMake 缓存。
 
 ## 环境与依赖
 
@@ -59,50 +63,53 @@ docs/images/                项目概览与架构图
 
 | 依赖 | 用途 |
 | --- | --- |
-| C++17 编译器、CMake 3.15+ | 构建 SDK、服务器与测试；源码声明最低 3.10，但本文命令使用 3.15 起提供的安装选项 |
+| C++17 编译器、CMake 3.15+ | 构建 SDK、服务器与测试；根工程与本文命令均要求 CMake 3.15 或更新版本 |
 | cpp-httplib 的 httplib.h | HTTP 客户端、服务器与内容接收回调 |
 | OpenSSL | 上游 HTTPS |
 | jsoncpp | JSON 请求与响应 |
 | SQLite3 | 会话与消息持久化 |
 | fmt、spdlog | 日志和格式化 |
-| gflags、Threads/pthread | 服务参数与线程 |
-| GoogleTest（可选） | 构建 test/ 下的示例测试 |
+| gflags、Threads/pthread、pkg-config | 服务参数、线程与依赖发现 |
+| GoogleTest（可选） | 构建 tests/ 下的手动集成测试 |
 | Ollama（使用本地 Provider 时） | 本地模型服务 |
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake libjsoncpp-dev libfmt-dev \
+sudo apt install build-essential cmake pkg-config libjsoncpp-dev libfmt-dev \
   libspdlog-dev libsqlite3-dev libgflags-dev libssl-dev curl
 ```
 
 **还需单独准备 cpp-httplib。** 仓库未提交 `httplib.h`，也未锁定兼容版本。请从 [cpp-httplib 官方仓库](https://github.com/yhirose/cpp-httplib) 准备头文件，放到编译器可搜索目录，例如 `/usr/local/include/httplib.h`。所选版本必须兼容源码中 `Request::content_receiver` 的四参数回调、`set_chunked_content_provider` 和 `Client::send`；本项目尚未记录已验证的依赖版本组合。若使用把 httplib 拆为头文件和共享库的系统包，需要额外核对其链接要求。
 
-## 获取、构建与安装
+## 获取与构建
 
-```bash
+~~~bash
 git clone https://github.com/759stronger/cpp-multi-llm-chat.git
 cd cpp-multi-llm-chat
-cmake -S chatsdk -B build/sdk -DCMAKE_INSTALL_PREFIX=/usr/local
-cmake --build build/sdk --parallel
-sudo cmake --install build/sdk
-cmake -S chatServer -B build/server
-cmake --build build/server --parallel
-```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+~~~
 
-SDK 的安装规则会生成 `/usr/local/lib/libai_chat_sdk.a` 和 `/usr/local/include/ai_chat_sdk/`。服务器按安装后的头文件与库名引用 SDK，因此应先完成 SDK 安装。
+根 CMake 默认构建 `ai_chat_sdk` 和 `AIChatServer`，服务器直接链接源码树中的 SDK 目标，无需先用管理员权限安装 SDK，也不依赖固定的 `/usr/local/lib` 搜索路径。SDK 的头文件与静态库安装规则仍保留，可按需要设置安装前缀后单独安装。
 
-### 构建检查
+SDK、服务器和可选测试共用 C++17、OpenSSL、cpp-httplib 和目标式依赖配置。OpenSSL 通过 `OpenSSL::SSL`、`OpenSSL::Crypto` 连接；其他开发库通过 pkg-config 查找。cpp-httplib 没有自动下载逻辑，头文件不在默认路径时，可配置：
 
-当前 `chatsdk/CMakeLists.txt` 的 OpenSSL 链接项写为 `OpenSSL:SSL`、`OpenSSL:Crypto`，与服务器及测试中使用的导入目标写法不同。建议将该行整理为：
+~~~bash
+cmake -S . -B build -DCPPHTTPLIB_INCLUDE_DIR=/path/to/headers
+~~~
 
-```cmake
-target_link_libraries(${SDK_NAME}
-  jsoncpp fmt spdlog sqlite3 OpenSSL::SSL OpenSSL::Crypto)
-```
+该目录应直接包含 `httplib.h`。依赖版本组合与真实模型协议仍需按实际环境验证，文档不把静态配置核对当作构建通过记录。
 
-这是需要检查的源码配置，不是本 README 已替你完成的修改。SDK 本身是静态库，服务器另行链接 OpenSSL，因此不能仅凭该拼写就断言当前构建一定失败。遇到编译或链接失败时，先检查 `httplib.h` 的版本、SDK 安装位置和实际链接输出。
+### 可选手动集成测试
 
-本仓库未提供已验证的一键安装脚本或锁定依赖环境；上述命令由现有构建文件推导，尚未在干净环境执行验证。
+真实模型集成测试默认不构建，也未注册为自动 CTest 用例。如需手动准备该可执行文件，可显式启用：
+
+~~~bash
+cmake -S . -B build -DBUILD_INTERACTIVE_TESTS=ON
+cmake --build build --target LLMTest
+~~~
+
+这里只构建，不自动执行。现有测试需要实际模型配置与终端输入，运行可能调用付费上游；不能将它视为离线单元测试。
 
 ## 配置与运行
 
@@ -122,14 +129,14 @@ export chatgpt_api_key="<your-chatgpt-key>"
 export gemini_api_key="<your-gemini-key>"
 ```
 
-请勿把真实密钥提交到仓库。随后从 `chatServer` 目录启动，以保证 `./www` 静态资源路径正确：
+请勿把真实密钥提交到仓库。随后从 `apps/chat_server` 目录启动，以保证 `./www` 静态资源路径正确：
 
 ```bash
-cd chatServer
-../build/server/AIChatServer --host=127.0.0.1 --port=8080
+cd apps/chat_server
+../../build/bin/AIChatServer --host=127.0.0.1 --port=8080
 ```
 
-打开 [http://127.0.0.1:8080](http://127.0.0.1:8080)。运行目录下会创建或读取 `chatDB.db`。
+打开 [http://127.0.0.1:8080](http://127.0.0.1:8080)。运行目录下会创建或读取 `chatDB.db`。 为继续使用已有本地会话数据，请保持该启动目录；从其他目录运行会使用其他位置的数据库。构建成功后还会将 `www` 复制到可执行文件旁。单配置构建的程序位于 `build/bin/`；Windows 使用 `.exe`，多配置生成器可能再增加配置名子目录。
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -198,7 +205,7 @@ curl -i -X DELETE "http://127.0.0.1:8080/api/sessions/<session-id>"
 
 ## 测试与当前边界
 
-- `test/` 使用 GoogleTest，但大部分 Provider 用例处于注释状态；启用的聊天测试需要真实上游和终端输入，不是独立离线回归测试。
+- `tests/` 使用 GoogleTest，但大部分 Provider 用例处于注释状态；启用的聊天测试需要真实上游和终端输入，不是独立离线回归测试。
 - 四类适配器有实际调用实现，但上游模型名称、请求/响应兼容性与完整流式错误处理尚未逐一验证。
 - 有连接和读取超时，尚未实现自动重试、跨 Provider fallback、调用限额或用量计费。
 - API 没有用户身份、会话归属和下游鉴权。默认监听所有地址；公网或共享部署前需要补齐访问控制及部署保护。
@@ -208,7 +215,7 @@ curl -i -X DELETE "http://127.0.0.1:8080/api/sessions/<session-id>"
 
 ## 后续完善
 
-1. 固定 cpp-httplib 与其他依赖版本，修整构建配置并补离线 Mock 测试。
+1. 固定 cpp-httplib 与其他依赖版本，验证当前构建配置并补离线 Mock 测试。
 2. 校验各 Provider 的非流式/流式协议、失败结束信号和模型配置。
 3. 加入下游鉴权、会话隔离、重试策略和服务生命周期验证。
 4. 再逐步扩展为具有路由、账号池、限流和用量记录的 AI 网关。

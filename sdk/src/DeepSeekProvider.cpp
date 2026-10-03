@@ -1,5 +1,5 @@
-#include "../include/GeminiProvider.h"
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/DeepSeekProvider.h>
+#include <ai_chat_sdk/util/my_logger.h>
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/reader.h>
 #include <jsoncpp/json/value.h>
@@ -8,7 +8,7 @@
 
 namespace chatsdk {
     // 初始化模型
-    bool GeminiProvider::initModel(const std::map<std::string , std::string>& model_config) {
+    bool DeepSeekProvider::initModel(const std::map<std::string , std::string>& model_config) {
        auto it = model_config.find("api_key");
        if (it == model_config.end()) {
            ERR("api_key is not found in model_config");
@@ -23,44 +23,43 @@ namespace chatsdk {
            _endpoint = it->second;
        }
        else {
-           _endpoint = "https://generativelanguage.googleapis.com";
+           _endpoint = "https://api.deepseek.com/v1";
        }
 
         _isAvailable = true;
-        INFO("GeminiProvider initModel success");
-        INFO("OPENAI_API_ENDPOINT: {}", _endpoint);
+        INFO("DeepSeekProvider initModel success");
+        INFO("DEEPSEEK_ENDPOINT: {}", _endpoint);
         return true;
     }
 
     // 检测模型是否有用
-    bool GeminiProvider::isAvailable() {
+    bool DeepSeekProvider::isAvailable() {
         return _isAvailable;
     }
 
     // 获取模型名称
-    std::string GeminiProvider::getModelName() const {
-        return "gemini-3.5-flash";
+    std::string DeepSeekProvider::getModelName() const {
+        return "deepseek-v4-flash";
     }
 
     // 获取模型描述信息
-    std::string GeminiProvider::getModelDesc() const {
-        return "一款基于Google Gemini的聊天模型";
+    std::string DeepSeekProvider::getModelDesc() const {
+        return "一款基于DeepSeek的聊天模型";
     }
 
-    //全量发送消息
-     std::string GeminiProvider::sendMessage(const std::vector<Message>& messages, const std::map<std::string, std::string>& request_param) {
+     std::string DeepSeekProvider::sendMessage(const std::vector<Message>& messages, const std::map<std::string, std::string>& request_param) {
         if(!_isAvailable) {
-            ERR("GeminiProvider is not available");
+            ERR("DeepSeekProvider is not available");
             return "";
         }
         double temperature = 0.7;
         int max_tokens = 2048;
 
         if(request_param.find("temperature") != request_param.end()) {
-            temperature = std::stof(request_param.find("temperature")->second);
+            temperature = std::stof(request_param.at("temperature"));
         }
         if(request_param.find("max_tokens") != request_param.end()) {
-            max_tokens = std::stoi(request_param.find("max_tokens")->second);
+            max_tokens = std::stoi(request_param.at("max_tokens"));
         }
 
         //构建历史信息
@@ -82,40 +81,38 @@ namespace chatsdk {
         //序列化
         Json::StreamWriterBuilder writer;
         std::string json_str = Json::writeString(writer, request_body);
-        DBG("GeminiProvider: request_body: {}", json_str);
 
         //创建HTTP client
         httplib::Client client(_endpoint);
-        client.set_connection_timeout(30,0);   // 30秒超时
+       client.set_connection_timeout(30,0);   // 30秒超时
         client.set_read_timeout(60,0);              // 60秒读取超时
-        client.set_proxy("127.0.0.1", 7890);
 
         //设置请求头
-        httplib::Headers headers = {{"Authorization", "Bearer " + _api_key}};
+        httplib::Headers headers = {{"Authorization", "Bearer " + _api_key}, {"Content-Type", "application/json"}};
         
         //发送POST请求
-        auto response = client.Post("/v1beta/openai/chat/completions", headers, json_str, "application/json");
+        auto response = client.Post("/v1/chat/completions", headers, json_str, "application/json");
         if(!response)
         {
-            ERR("Failed to connect to Gemini , check your netword and SSL");
+            ERR("Failed to connect to Deepseek , check your netword and SSL");
             return "";
         }
 
         //解析响应体
-        // Json::Reader reader;
-        // Json::Value root;
-        // if(!reader.parse(response->body, root))
-        // {
-        //     ERR("Failed to parse response body");
-        //     return "";
-        // }
-        DBG("Gemini API response  status: {}", response->status);
-        DBG("Gemini API response body: {}", response->body);
-        
+        Json::Reader reader;
+        Json::Value root;
+        if(!reader.parse(response->body, root))
+        {
+            ERR("Failed to parse response body");
+            return "";
+        }
+        DBG("DeepSeek API response  status: {}", response->status);
+        DBG("DeepSeek API response body: {}", response->body);
+
         //检测响应是否成功
         if(response->status != 200)
         {
-            ERR("Gemini API returned non 200 status {}-{}", response->status,response->body);
+            ERR("DeepSeekAPI returned non 200 status {}-{}", response->status,response->body);
             return ""; 
         }
 
@@ -127,7 +124,7 @@ namespace chatsdk {
 
         if(!Json::parseFromStream( reader_builder, response_stream, &response_json, &parse_errors)) // 解析响应体   
         {
-            ERR("Failed to parse Gemini response body: {}", parse_errors);
+            ERR("Failed to parse response body: {}", parse_errors);
             return "";
         }
 
@@ -135,43 +132,41 @@ namespace chatsdk {
         //大模型回复包含在choices数组的第一个元素的message.content中
       if(response_json.isMember("choices") && response_json["choices"].isArray() && !response_json["choices"].empty())
       {
-          auto& choice  = response_json["choices"][0];
-         if(choice.isMember("message")  && choice["message"].isArray())
-         {      
-            std::string reply_content = choice["content"]["content"].asString();
-            INFO("Gemini API reply: {}", reply_content);
+          auto choice  = response_json["choices"][0];
+         if(choice.isMember("message") && choice["message"].isMember("content"))
+         {
+            std::string reply_content = choice["message"]["content"].asString();
+            INFO("DeepSeek API reply: {}", reply_content);
             return reply_content;
          }
          
       }
-      ERR("Invalid response format from Gemini");
-      return "Invalid response format from Gemini";
+      ERR("Invalid response format from DeepSeek");
+      return "Invalid response format from DeepSeek";
 
     }
 
-    std::string GeminiProvider::sendStreamMessage(const std::vector<Message>& messages,const std::map<std::string, std::string>& request_param,std::function<void(const std::string&, bool)> callback) 
+    std::string DeepSeekProvider::sendStreamMessage(const std::vector<Message>& messages,const std::map<std::string, std::string>& request_param,std::function<void(const std::string&, bool)> callback) 
 {
     
-        INFO("GeminiProvider sendStreamMessage");
+        INFO("DeepSeekProvider sendStreamMessage");
         if (!_isAvailable) {
-            ERR("Error: GeminiProvider is not available");
-            return "";
-        } 
-        
+        ERR("Error: DeepSeekProvider is not available");
+        return "";
+         }
+    
         //获取采样温度 和 max_tokens
         double temperature = 0.7;
         int max_tokens = 2048;
 
         if(request_param.find("temperature") != request_param.end())
         {
-            temperature = std::stof(request_param.find("temperature")->second);
+            temperature = std::stof(request_param.at("temperature"));
         }
         if(request_param.find("max_tokens") != request_param.end())
         {
-            max_tokens = std::stoi(request_param.find("max_tokens")->second);
+            max_tokens = std::stoi(request_param.at("max_tokens"));
         }
-
-
 
         //构建历史信息
         Json::Value messages_array(Json::arrayValue);
@@ -195,13 +190,12 @@ namespace chatsdk {
         //序列化
         Json::StreamWriterBuilder writer;
         std::string     json_string = Json::writeString(writer , request_body);
-        DBG("GeminiProvider: Send stream request to Gemini Server,request_body: {}", json_string);
+        DBG("DeepSeekProvider: Send stream request to deepseek Server,request_body: {}", json_string);
 
         //创建HTTP client
         httplib::Client client (_endpoint);
         client.set_connection_timeout(30,0); //30秒超时
         client.set_read_timeout(300,0);    //流式要更长时间
-        client.set_proxy("127.0.0.1", 7890);
 
         //设置请求头
         httplib::Headers headers = {
@@ -216,13 +210,12 @@ namespace chatsdk {
         std::string errorMsg ;//错误描述符
         int statusCode = 0 ;//状态码
         bool streamFinish =false ; //标记流式返回数据是否结束
-
         std::string fullResponse; //累计完整响应
 
         //创建请求对象
         httplib::Request req;
         req.method = "POST" ;
-        req.path = "/v1beta/openai/chat/completions";
+        req.path = "/v1/chat/completions";
         req.headers = headers;
         req.body = json_string;
 
@@ -235,7 +228,7 @@ namespace chatsdk {
 // 流式响应：只有一个响应头，但响应体被拆分成多个块(chunks)陆续发送，即一头多块
 
         // 响应头处理
-        req.response_handler = [&](const httplib::Response& response){
+        req.response_handler = [&](const httplib::Response response){
             statusCode = response.status;
             if(200 != statusCode)
             {
@@ -269,19 +262,20 @@ namespace chatsdk {
                 {
                     continue;
                 }
-                std::string jsonStr;
 
-                if(0 == event.compare(0 , 6 ,"data: "))
+                //检查事件类型
+                if(event.compare( 0 , 6 ,"data: ") == 0)
                 {
-                    jsonStr = event.substr(6);
+                    std::string jsonStr = event.substr(6);
+
+                    //处理结束标记
                     if(jsonStr == "[DONE]")
                     {
-                        callback("" ,true);
+                        callback("",true);
                         streamFinish = true;
                         return true;
                     }
-                }
-               
+
                     //解析json数据
                     Json::Value chunk;
                     Json::CharReaderBuilder reader_builder;
@@ -290,22 +284,26 @@ namespace chatsdk {
 
                     if(Json::parseFromStream(reader_builder , jsonStream ,&chunk ,&errs))
                     {
-                       std::string text;
-                       if(chunk.isMember("choices") && chunk["choices"].isArray()&& !chunk["choices"].empty() && chunk["choices"][0].isMember("delta"))
-                       {
-                           auto& delta = chunk["choices"][0]["delta"];
-                           if(delta.isMember("content"))
-                               text = delta["content"].asString();
-                           if(delta.isMember("reasoning_content"))
-                               text += delta["reasoning_content"].asString();
-                       }
-                       if(!text.empty())
-                       {
-                           fullResponse += text;
-                           callback(text, false);
-                       }
+                        std::string text;
+                        if(chunk.isMember("choices") &&
+                            chunk["choices"].isArray() &&
+                            !chunk["choices"].empty() &&
+                            chunk["choices"][0].isMember("delta"))
+                        {
+                            auto& delta = chunk["choices"][0]["delta"];
+                            if(delta.isMember("content"))
+                                text = delta["content"].asString();
+                            if(delta.isMember("reasoning_content"))
+                                text += delta["reasoning_content"].asString();
+                        }
+                        if(!text.empty())
+                        {
+                            fullResponse += text;
+                            callback(text, false);
+                        }
                     }
-            };
+                }
+            }
         
             return true;//继续接受数据
         };
@@ -327,7 +325,9 @@ namespace chatsdk {
             WARN("Stream ended without [DONE] marker");
             callback("" , true);
         }
+
         return fullResponse;
+
     }
 
 }

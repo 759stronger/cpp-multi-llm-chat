@@ -1,5 +1,5 @@
-#include "../include/ChatGPTProvider.h"
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/ChatGPTProvider.h>
+#include <ai_chat_sdk/util/my_logger.h>
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/reader.h>
 #include <jsoncpp/json/value.h>

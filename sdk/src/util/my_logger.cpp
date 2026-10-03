@@ -1,4 +1,4 @@
-#include "../../include/util/my_logger.h"
+#include <ai_chat_sdk/util/my_logger.h>
 namespace my_logger {
     // 日志记录器成员变量
     std::shared_ptr<spdlog::logger> Logger::_logger = nullptr;

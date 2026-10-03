@@ -1,5 +1,5 @@
-#include "../include/DeepSeekProvider.h"
-#include "../include/util/my_logger.h"
+#include <ai_chat_sdk/OllamaDeepSeekProvider.h>
+#include <ai_chat_sdk/util/my_logger.h>
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/reader.h>
 #include <jsoncpp/json/value.h>
@@ -8,48 +8,60 @@
 
 namespace chatsdk {
     // 初始化模型
-    bool DeepSeekProvider::initModel(const std::map<std::string , std::string>& model_config) {
-       auto it = model_config.find("api_key");
+    bool OllamaDeepSeekProvider::initModel(const std::map<std::string , std::string>& model_config) {
+       //初始化名称
+      auto it = model_config.find("model_name");
        if (it == model_config.end()) {
-           ERR("api_key is not found in model_config");
+           ERR("ollama_model_name is not found in model_config");
            return false;
        }
        else {
-           _api_key = it->second;
+           _model_name_ = it->second;
        }
-
-       it = model_config.find("base_url");
+       //初始化描述
+       it = model_config.find("model_desc");
+       if (it != model_config.end()) {
+           _model_desc_ = it->second;
+       }
+       else {
+           ERR("ollama_model_desc is not found in model_config");
+           return false;
+       }
+       //初始化endpoint
+       it = model_config.find("endpoint");
        if (it != model_config.end()) {
            _endpoint = it->second;
        }
        else {
-           _endpoint = "https://api.deepseek.com/v1";
+           ERR("ollama_endpoint is not found in model_config");
+           return false;
        }
 
         _isAvailable = true;
-        INFO("DeepSeekProvider initModel success");
-        INFO("DEEPSEEK_ENDPOINT: {}", _endpoint);
+        INFO("OllamaDeepSeekProvider initModel success");
+        INFO("OLLAMA_ENDPOINT: {}", _endpoint);
         return true;
     }
 
     // 检测模型是否有用
-    bool DeepSeekProvider::isAvailable() {
+    bool OllamaDeepSeekProvider::isAvailable() {
         return _isAvailable;
     }
 
     // 获取模型名称
-    std::string DeepSeekProvider::getModelName() const {
-        return "deepseek-v4-flash";
+    std::string OllamaDeepSeekProvider::getModelName() const {
+        return _model_name_;
     }
 
     // 获取模型描述信息
-    std::string DeepSeekProvider::getModelDesc() const {
-        return "一款基于DeepSeek的聊天模型";
+    std::string OllamaDeepSeekProvider::getModelDesc() const {
+        return _model_desc_;
     }
 
-     std::string DeepSeekProvider::sendMessage(const std::vector<Message>& messages, const std::map<std::string, std::string>& request_param) {
+    std::string OllamaDeepSeekProvider::sendMessage(const std::vector<Message>& messages, 
+              const std::map<std::string, std::string>& request_param) {
         if(!_isAvailable) {
-            ERR("DeepSeekProvider is not available");
+            ERR("OllamaDeepSeekProvider is not available");
             return "";
         }
         double temperature = 0.7;
@@ -72,11 +84,15 @@ namespace chatsdk {
         }
 
         //构建请求体
+        Json::Value options;
+        options["temperature"] = temperature;
+        options["num_ctx"] = max_tokens;
+        
         Json::Value request_body;
         request_body["model"] = getModelName();
         request_body["messages"] = message_array;
-        request_body["temperature"] = temperature;
-        request_body["max_tokens"] = max_tokens;        
+        request_body["stream"] = false;
+        request_body["options"] = options;        
 
         //序列化
         Json::StreamWriterBuilder writer;
@@ -88,13 +104,13 @@ namespace chatsdk {
         client.set_read_timeout(60,0);              // 60秒读取超时
 
         //设置请求头
-        httplib::Headers headers = {{"Authorization", "Bearer " + _api_key}, {"Content-Type", "application/json"}};
+        httplib::Headers headers = { {"Content-Type", "application/json"}};
         
         //发送POST请求
-        auto response = client.Post("/v1/chat/completions", headers, json_str, "application/json");
+        auto response = client.Post("/api/chat", headers, json_str, "application/json");
         if(!response)
         {
-            ERR("Failed to connect to Deepseek , check your netword and SSL");
+            ERR("Failed to connect to OllamaDeepSeek , check your netword and SSL");
             return "";
         }
 
@@ -106,13 +122,13 @@ namespace chatsdk {
             ERR("Failed to parse response body");
             return "";
         }
-        DBG("DeepSeek API response  status: {}", response->status);
-        DBG("DeepSeek API response body: {}", response->body);
+        DBG("OllamaDeepSeek API response  status: {}", response->status);
+        DBG("OllamaDeepSeek API response body: {}", response->body);
 
         //检测响应是否成功
         if(response->status != 200)
         {
-            ERR("DeepSeekAPI returned non 200 status {}-{}", response->status,response->body);
+            ERR("OllamaDeepSeek API returned non 200 status {}-{}", response->status,response->body);
             return ""; 
         }
 
@@ -130,28 +146,23 @@ namespace chatsdk {
 
         //解析大模型回复
         //大模型回复包含在choices数组的第一个元素的message.content中
-      if(response_json.isMember("choices") && response_json["choices"].isArray() && !response_json["choices"].empty())
-      {
-          auto choice  = response_json["choices"][0];
-         if(choice.isMember("message") && choice["message"].isMember("content"))
-         {
-            std::string reply_content = choice["message"]["content"].asString();
-            INFO("DeepSeek API reply: {}", reply_content);
-            return reply_content;
-         }
-         
-      }
-      ERR("Invalid response format from DeepSeek");
-      return "Invalid response format from DeepSeek";
-
+    if(response_json.isMember("message") && response_json["message"].isMember("content"))
+    {
+        std::string reply_content = response_json["message"]["content"].asString();
+        INFO("OllamaDeepSeek API reply: {}", reply_content);
+        return reply_content;
     }
+    ERR("Invalid response format from OllamaDeepSeek");
+    return "Invalid response format from OllamaDeepSeek";
 
-    std::string DeepSeekProvider::sendStreamMessage(const std::vector<Message>& messages,const std::map<std::string, std::string>& request_param,std::function<void(const std::string&, bool)> callback) 
+}
+
+std::string OllamaDeepSeekProvider::sendStreamMessage(const std::vector<Message>& messages,const std::map<std::string, std::string>& request_param,std::function<void(const std::string&, bool)> callback) 
 {
     
-        INFO("DeepSeekProvider sendStreamMessage");
+        INFO("OllamaDeepSeekProvider sendStreamMessage");
         if (!_isAvailable) {
-        ERR("Error: DeepSeekProvider is not available");
+        ERR("Error: OllamaDeepSeekProvider is not available");
         return "";
          }
     
@@ -178,19 +189,21 @@ namespace chatsdk {
             messages_array.append(msg);
         }
 
-        //构建请求体
+         //构建请求体
+        Json::Value options;
+        options["temperature"] = temperature;
+        options["num_ctx"] = max_tokens;
+        
         Json::Value request_body;
-        //request_body["model"] = "deepseek-chat";
         request_body["model"] = getModelName();
         request_body["messages"] = messages_array;
-        request_body["temperature"] = temperature;
-        request_body["max_tokens"] = max_tokens; 
-        request_body["stream"] = true; //开启流式
+        request_body["stream"] = true;
+        request_body["options"] = options;   
 
         //序列化
         Json::StreamWriterBuilder writer;
         std::string     json_string = Json::writeString(writer , request_body);
-        DBG("DeepSeekProvider: Send stream request to deepseek Server,request_body: {}", json_string);
+        DBG("OllamaDeepSeekProvider: Send stream request to deepseek Server,request_body: {}", json_string);
 
         //创建HTTP client
         httplib::Client client (_endpoint);
@@ -199,9 +212,7 @@ namespace chatsdk {
 
         //设置请求头
         httplib::Headers headers = {
-            {"Authorization" , "Bearer " + _api_key},
             {"Content-Type" , "application/json"},
-            {"Accept" , "text/event-stream"}
         };
         
         //流式处理变量
@@ -215,7 +226,7 @@ namespace chatsdk {
         //创建请求对象
         httplib::Request req;
         req.method = "POST" ;
-        req.path = "/v1/chat/completions";
+        req.path = "/api/chat";
         req.headers = headers;
         req.body = json_string;
 
@@ -253,57 +264,49 @@ namespace chatsdk {
 
             //处理完所有事件  事件和事件之间以\n\n分隔
             size_t pos = 0;
-            while( (pos = buffer.find("\n\n")) != std::string::npos  )
+            while( (pos = buffer.find("\n")) != std::string::npos  )
             {
                 std::string event = buffer.substr(0 , pos);
-                buffer.erase(0 , pos+2); //移除已经处理的事件
+                buffer.erase(0 , pos+1); //移除已经处理的事件
                 //处理空行和注释 以：开头是注释行
-                if(event.empty() || event[0] ==':')
+                if(event.empty() )
                 {
                     continue;
                 }
-
-                //检查事件类型
-                if(event.compare( 0 , 6 ,"data: ") == 0)
-                {
-                    std::string jsonStr = event.substr(6);
-
-                    //处理结束标记
-                    if(jsonStr == "[DONE]")
-                    {
-                        callback("",true);
-                        streamFinish = true;
-                        return true;
-                    }
 
                     //解析json数据
                     Json::Value chunk;
                     Json::CharReaderBuilder reader_builder;
                     std::string errs;
-                    std::istringstream jsonStream(jsonStr);
+                    std::istringstream jsonStream(event);
 
                     if(Json::parseFromStream(reader_builder , jsonStream ,&chunk ,&errs))
                     {
-                        std::string text;
-                        if(chunk.isMember("choices") &&
-                            chunk["choices"].isArray() &&
-                            !chunk["choices"].empty() &&
-                            chunk["choices"][0].isMember("delta"))
+                        //处理结束标记
+                        if(chunk.get("done" ,false).asBool())
                         {
-                            auto& delta = chunk["choices"][0]["delta"];
-                            if(delta.isMember("content"))
-                                text = delta["content"].asString();
-                            if(delta.isMember("reasoning_content"))
-                                text += delta["reasoning_content"].asString();
+                            callback("",true);
+                            streamFinish = true;
+                            return true;
                         }
-                        if(!text.empty())
+
+                        //提取增量内容
+                        if(chunk.isMember("message") &&
+                            chunk["message"].isMember("content"))
                         {
-                            fullResponse += text;
-                            callback(text, false);
+                            std::string content = chunk["message"]["content"].asString();
+                            //累积到完整响应
+                            fullResponse += content;
+                            callback(content ,false);
+                        }
+                        else
+                        {
+                            WARN("DeepSeek SSE JSON parse error : {}", errs);
+                            
                         }
                     }
-                }
-            }
+            };
+            
         
             return true;//继续接受数据
         };

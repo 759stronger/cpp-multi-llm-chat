@@ -1,14 +1,30 @@
-build/
-*.o
-*.a
-*.so
-*.exe
-*.out
-*.db
-*.tar.gz
-*.log
-.DS_Store
-.vscode/
-.idea/
+# Build directories, including preserved legacy outputs
+/build/
+**/build/
 cmake-build-*/
 CMakeUserPresets.json
+compile_commands.json
+
+# Local data, credentials, logs, and existing private backups
+/local/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+.env
+.env.*
+*.log
+*.tar.gz
+
+# Compiled outputs and editor metadata
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dll
+*.exe
+*.pdb
+.vs/
+.DS_Store
+Thumbs.db

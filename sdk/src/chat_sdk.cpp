@@ -1,12 +1,12 @@
-#include "../include/chat_sdk.h"
-#include "../include/DeepSeekProvider.h"
-#include "../include/OllamaDeepSeekProvider.h"
-#include "../include/ChatGPTProvider.h"
-#include "../include/GeminiProvider.h"
-#include "../include/util/my_logger.h"
-#include "../include/common.h"
-#include "../include/session_manager.h"
-#include "../include/dataManager.h"
+#include <ai_chat_sdk/chat_sdk.h>
+#include <ai_chat_sdk/DeepSeekProvider.h>
+#include <ai_chat_sdk/OllamaDeepSeekProvider.h>
+#include <ai_chat_sdk/ChatGPTProvider.h>
+#include <ai_chat_sdk/GeminiProvider.h>
+#include <ai_chat_sdk/util/my_logger.h>
+#include <ai_chat_sdk/common.h>
+#include <ai_chat_sdk/session_manager.h>
+#include <ai_chat_sdk/dataManager.h>
 
 #include <memory>
 #include <string>
